@@ -195,13 +195,15 @@ for i_rep = 1:NrRepetitions
     s_FBMC_Aux = G_FBMC*x_FBMC_Aux(:); % Same as "FBMC.Modulation(x_FBMC_Aux)" which is computationally more efficient. But G_FBMC is consistent with the paper.
         
     %% 信道
-    ConvolutionMatrix = ChannelModel.GetConvolutionMatrix{1};
-   
-    r_FBMC_Aux_noNoise = ConvolutionMatrix*s_FBMC_Aux;
+    %ConvolutionMatrix = ChannelModel.GetConvolutionMatrix{1};
+    channel = rayleighchan(1/SamplingRate,0);
+    %r_FBMC_Aux_noNoise = ConvolutionMatrix*s_FBMC_Aux;
+    r_FBMC_Aux_noNoise = filter(channel,s_FBMC_Aux);
+    h = r_FBMC_Aux_noNoise./s_FBMC_Aux;
     
     %% 传输矩阵
-    D_FBMC = Q_FBMC'*ConvolutionMatrix*G_FBMC;
-       
+    %D_FBMC = Q_FBMC'*ConvolutionMatrix*G_FBMC;
+     D_FBMC = Q_FBMC'*diag(h)*G_FBMC;
     %% 单抽头信道（已知完美信道信息）
     h_FBMC = diag(D_FBMC);
            
@@ -294,7 +296,7 @@ for i_rep = 1:NrRepetitions
   %   semilogy(M_SNR_dB, nanmean(BER_FBMC_Aux_OneTapEqualizer_PerfectCSI,2),'-x','Color',[1 1 0]*0.7,'Markersize',Markersize);
   %  semilogy(M_SNR_dB, nanmean(BER_FBMC_Aux_OneTapEqualizer,2),'-s red','Markersize',Markersize);
     ylim([10^-2 0.5]);
-    semilogy([PlotIterationStepsSNRdB PlotIterationStepsSNRdB],[10^-2 10^-1],'Color',[1 1 1]*0.5,'Linewidth',1);
+   % semilogy([PlotIterationStepsSNRdB PlotIterationStepsSNRdB],[10^-2 10^-1],'Color',[1 1 1]*0.5,'Linewidth',1);
     title(['FBMC 辅助导频实现 ' int2str(i_rep) '/'  int2str(NrRepetitions)])
   %  legend({'Doubly-Flat 理论','Cancellation (完美 CSI)','Cancellation','单抽头 (完美 CSI)','单抽头'});
     ylabel('误码率');
