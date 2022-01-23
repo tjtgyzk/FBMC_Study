@@ -7,6 +7,7 @@ M_SNR_OFDM_dB =[0:5:30];
 NrRepetitions = 500;
 NrTime=50;
 QAM_ModulationOrder = 16; % 4 16 64 128 ...
+iteration = 4;
 
 %% FBMC模块
 FBMC = Modulation.FBMC(...
@@ -62,7 +63,7 @@ AuxiliaryMethod = ChannelEstimation.ImaginaryInterferenceCancellationAtPilotPosi
 BER_FBMC_Aux = nan(length(M_SNR_OFDM_dB),NrRepetitions);
 MSE_FBMC_Aux = nan(length(M_SNR_OFDM_dB),NrRepetitions);
 Time_FBMC_Aux = nan(length(M_SNR_OFDM_dB),NrRepetitions);
-save settings.mat AuxiliaryMethod ChannelEstimation_FBMC FBMC M_SNR_OFDM_dB NrRepetitions NrTime PAM QAM QAM_ModulationOrder
+%save settings.mat AuxiliaryMethod ChannelEstimation_FBMC FBMC M_SNR_OFDM_dB NrRepetitions NrTime PAM QAM QAM_ModulationOrder
 for i_rep = 1:NrRepetitions
 for i_SNR = 1:length(M_SNR_OFDM_dB)
 
@@ -86,16 +87,16 @@ for i_SNR = 1:length(M_SNR_OFDM_dB)
         
    end
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    Binarysignal(:,:,i_SNR,i_rep) = BinaryDataStream_FBMC_Aux_signal;
-    Binarydata(:,:,i_SNR,i_rep) = BinaryDataStream_FBMC_Aux_data;
-    Lastxp(:,:,i_SNR,i_rep) = xP_FBMC;
+ %   Binarysignal(:,:,i_SNR,i_rep) = BinaryDataStream_FBMC_Aux_signal;
+ %   Binarydata(:,:,i_SNR,i_rep) = BinaryDataStream_FBMC_Aux_data;
+ %   Lastxp(:,:,i_SNR,i_rep) = xP_FBMC;
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %% 信道 (doubly flat fading and AWGN in accordance with our testbed measurements!)     
         [h,~] = Jakes_Flat(FBMC,NrTime);
         h=abs(h);
         h=h./norm(h,'inf');
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    chennel(:,i_SNR,i_rep) = h;
+%    chennel(:,i_SNR,i_rep) = h;
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         n_FBMC = sqrt(1/2)*sqrt(Pn_time/2)*(randn(size(s_FBMC_Aux))+1j*randn(size(s_FBMC_Aux)));
         
@@ -115,13 +116,15 @@ for i_SNR = 1:length(M_SNR_OFDM_dB)
         end
     end
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-         FirstY(:,:,:,i_SNR,i_rep) = y_FBMC_Aux;
+    %     FirstY(:,:,:,i_SNR,i_rep) = y_FBMC_Aux;
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %% 使用插值法进行信道估计并计算 MSE
         tic;
         h_FBMC_Aux = interp1(index,hP_LS_FBMC_Aux,(1:NrTime),'linear','extrap');
+        
         Time_FBMC_Aux(i_SNR,i_rep)=toc;
         MSE_FBMC_Aux(i_SNR,i_rep)=var(h-(h_FBMC_Aux).');
+        
         %数据位置处的均衡接收符号
         Tp=0;Tpd=0;
         for t = 1:NrTime
@@ -143,8 +146,8 @@ for i_SNR = 1:length(M_SNR_OFDM_dB)
              end
         end
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        IterationOneUsedDetectedSignal(:,:,i_SNR,i_rep) = DetectedBitStream_FBMC_Aux_signal;
-        IterationOneUsedDetectedData(:,:,i_SNR,i_rep) = DetectedBitStream_FBMC_Aux_data;
+     %   IterationOneUsedDetectedSignal(:,:,i_SNR,i_rep) = DetectedBitStream_FBMC_Aux_signal;
+     %   IterationOneUsedDetectedData(:,:,i_SNR,i_rep) = DetectedBitStream_FBMC_Aux_data;
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %% 计算 BER
         BER_FBMC_Aux(i_SNR,i_rep)=mean([BER_FBMC_Aux_data,BER_FBMC_Aux_signal]);
@@ -154,9 +157,9 @@ end
        disp([int2str(i_rep/NrRepetitions*100) '%']);
     end
 end
-save BerBefore.mat BER_FBMC_Aux
-save MSEBefore.mat MSE_FBMC_Aux
-save FirstRunData.mat Binarysignal Binarydata Lastxp chennel FirstY  IterationOneUsedDetectedSignal IterationOneUsedDetectedData
+%save BerBefore.mat BER_FBMC_Aux
+%save MSEBefore.mat MSE_FBMC_Aux
+%save FirstRunData.mat Binarysignal Binarydata Lastxp chennel FirstY  IterationOneUsedDetectedSignal IterationOneUsedDetectedData
 %% Plot MSE
 figure();
 semilogy(M_SNR_OFDM_dB,trimmean(MSE_FBMC_Aux',2),'red -o');

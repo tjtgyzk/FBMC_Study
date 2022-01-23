@@ -3,16 +3,17 @@ addpath('./Theory');
 %% 参数
 % 仿真
 M_SNR_dB                  = [10:5:40];              % 信噪比dB
-NrRepetitions             = 25;                     % 蒙特卡罗重复次数（不同信道实现）             
+NrRepetitions             = 100;                     % 蒙特卡罗重复次数（不同信道实现）             
 ZeroThresholdSparse       = 8;                      % 将一些小于“10^（-ZeroThresholdSparse）”的矩阵值设置为零。
-PlotIterationStepsSNRdB   = 35;                     % 绘制SNR为35dB的迭代步骤上的误码率。
+PlotIterationStepsSNRdB   = 40;                     % 绘制SNR为35dB的迭代步骤上的误码率。
 
 % FBMC与OFDM参数
 L                         = 12*2;                   % 子载波数，一个资源块由12个子载波组成（时间为0.5ms）
+LCC                       = 3                       % 卷积码限制长度
 F                         = 15e3;                   % 子载波间隔（Hz）
 SamplingRate              = F*12*2;                 % 采样率（采样数/秒）
 NrSubframes               = 1;                      % 子帧的数目。F=15kHz时，一个子帧需要1ms。                             
-QAM_ModulationOrder       = 4;                      % QAM信号星座顺序，4，16，64，256，1024，。。。
+QAM_ModulationOrder       = 256;                      % QAM信号星座顺序，4，16，64，256，1024，。。。
 
 % 信道估计参数
 PilotToDataPowerOffset    = 2;                      % OFDM的导频到数据功率偏移。在FBMC数据扩展中，功率偏移是该数字的两倍。 
@@ -21,7 +22,7 @@ NrIterations              = 4;                      % 干扰消除方案的迭�
 
 % Channel
 Velocity_kmh              = 500;                    % 速度单位为km/h。请注意 [mph]*1.6=[kmh] and [m/s]*3.6=[kmh]        
-PowerDelayProfile         = 'VehicularA';                 % 信道模型，字符串或向量：'Flat', 'AWGN', 'PedestrianA', 'PedestrianB', 'VehicularA', 'VehicularB', 'ExtendedPedestrianA', 'ExtendedPedestrianB', or 'TDL-A_xxns','TDL-B_xxns','TDL-C_xxns' (with xx the RMS delay spread in ns, e.g. 'TDL-A_30ns'), or [1 0 0.2] (Self-defined power delay profile which depends on the sampling rate) 
+PowerDelayProfile         = 'Flat';                 % 信道模型，字符串或向量：'Flat', 'AWGN', 'PedestrianA', 'PedestrianB', 'VehicularA', 'VehicularB', 'ExtendedPedestrianA', 'ExtendedPedestrianB', or 'TDL-A_xxns','TDL-B_xxns','TDL-C_xxns' (with xx the RMS delay spread in ns, e.g. 'TDL-A_30ns'), or [1 0 0.2] (Self-defined power delay profile which depends on the sampling rate) 
 doopler = Velocity_kmh/3.6*2.5e9/2.998e8;
 %% FBMC对象
 FBMC = Modulation.FBMC(...
@@ -34,7 +35,7 @@ FBMC = Modulation.FBMC(...
     'PHYDYAS-OQAM',...                  % 原型滤波器（Hermite、PHYDYAS、RRC）和OQAM或QAM， 
     8, ...                              % 重叠因子（还确定频域中的过采样）
     0, ...                              % 初始相移
-    true ...                            % 多相实现
+    false ...                            % 多相实现
     );
 N = FBMC.Nr.SamplesTotal;
 
@@ -77,9 +78,9 @@ ChannelModel = Channel.FastFading(...
     SamplingRate,...                                   % 采样率（采样数/秒）
     PowerDelayProfile,...                              % 功率延迟配置文件，字符串或向量: 'Flat', 'AWGN', 'PedestrianA', 'PedestrianB', 'VehicularA', 'VehicularB', 'ExtendedPedestrianA', 'ExtendedPedestrianB', or 'TDL-A_xxns','TDL-B_xxns','TDL-C_xxns' (with xx the RMS delay spread in ns, e.g. 'TDL-A_30ns'), or [1 0 0.2] (取决于采样率的自定义功率延迟曲线)
     N,...                                              % 总样本数
-    Velocity_kmh/3.6*2.5e9/2.998e8,...                 % 最大多普勒频移: Velocity_kmh/3.6*CarrierFrequency/2.998e8
+    doopler,...                 % 最大多普勒频移: Velocity_kmh/3.6*CarrierFrequency/2.998e8
     'Jakes',...                                        % 多普勒模型: 'Jakes', 'Uniform', 'Discrete-Jakes', 'Discrete-Uniform'. For "Discrete-", 我们假设一个离散的多普勒频谱来提高仿真时间。只有在样本数量和速度足够大的情况下，这种方法才能准确工作
-    5,...                                            % WSSUS进程的路径数. 只和 'Jakes' 和 'Uniform' 多普勒频谱相关
+    200,...                                            % WSSUS进程的路径数. 只和 'Jakes' 和 'Uniform' 多普勒频谱相关
     1,...                                              % 发射天线的数量
     1,...                                              % 接收天线的数量
     1 ...                                              % 如果通道的预定义延迟抽头不符合采样率，则发出警告。如果它们大致相同，这通常不是什么大问题。
@@ -181,9 +182,14 @@ for i_rep = 1:NrRepetitions
     ChannelModel.NewRealization;
     
     %% 二进制数据
-    BinaryDataStream_FBMC_Aux = randi([0 1],AuxiliaryMethod.NrDataSymbols*log2(PAM.ModulationOrder),1);
+    BinaryDataStream_FBMC_Aux = randi([0 1],AuxiliaryMethod.NrDataSymbols*log2(PAM.ModulationOrder)/2,1);
+    tblen = 6*LCC;
+    trel = poly2trellis(LCC,[5,7]);
+    BinaryDataChannelCoded = convenc(BinaryDataStream_FBMC_Aux',trel);
+    BinaryDataChannelCoded = BinaryDataChannelCoded';
     %% 数据符号
-    xD_FBMC_Aux = PAM.Bit2Symbol(BinaryDataStream_FBMC_Aux);     
+    % xD_FBMC_Aux = PAM.Bit2Symbol(BinaryDataStream_FBMC_Aux); 
+    xD_FBMC_Aux = PAM.Bit2Symbol(BinaryDataChannelCoded);
     %% 导频符号
     xP_FBMC = PAM.SymbolMapping(randi(PAM.ModulationOrder,AuxiliaryMethod.NrPilotSymbols,1));
     xP_FBMC = xP_FBMC./abs(xP_FBMC);
@@ -234,19 +240,26 @@ for i_rep = 1:NrRepetitions
         h_est_FBMC_Aux = diag(D_FBMC_est_Aux);  
         x_est_OneTapEqualizer_FBMC_Aux = y_FBMC_Aux./h_est_FBMC_Aux;
         xD_est_OneTapEqualizer_FBMC_Aux = real(x_est_OneTapEqualizer_FBMC_Aux(AuxilaryPilotMatrix_FBMC(:)==0)./sqrt(AuxiliaryMethod.DataPowerReduction));
-        DetectedBitStream_OneTapEqualizer_FBMC_Aux = PAM.Symbol2Bit(xD_est_OneTapEqualizer_FBMC_Aux);   
-        BER_FBMC_Aux_OneTapEqualizer(i_SNR,i_rep) = mean(BinaryDataStream_FBMC_Aux~=DetectedBitStream_OneTapEqualizer_FBMC_Aux);    
+        DetectedBitStream_OneTapEqualizer_FBMC_Aux = PAM.Symbol2Bit(xD_est_OneTapEqualizer_FBMC_Aux);
+        %% 信道解码
+        DetectedBitStream_OneTapEqualizer_FBMC_Aux = DetectedBitStream_OneTapEqualizer_FBMC_Aux';
+        x = zeros(1,2*tblen);
+        DetectedBitStream_OneTapEqualizer_FBMC_Aux_AddZeros = [DetectedBitStream_OneTapEqualizer_FBMC_Aux,x];
+        DetectedBitStream_OneTapEqualizer_FBMC_Aux_Vitdec = vitdec(DetectedBitStream_OneTapEqualizer_FBMC_Aux_AddZeros,trel,tblen,'cont','hard');
+        DetectedBitStream_OneTapEqualizer_FBMC_Aux_Decoded = DetectedBitStream_OneTapEqualizer_FBMC_Aux_Vitdec(tblen+1:end);
+        DetectedBitStream_OneTapEqualizer_FBMC_Aux_Decoded = DetectedBitStream_OneTapEqualizer_FBMC_Aux_Decoded';
+        BER_FBMC_Aux_OneTapEqualizer(i_SNR,i_rep) = mean(BinaryDataStream_FBMC_Aux~=DetectedBitStream_OneTapEqualizer_FBMC_Aux_Decoded);    
              
         %% 单抽头均衡器, 完美已知信道信息
-        x_est_OneTapEqualizer_FBMC_Aux_PerfectCSI = y_FBMC_Aux./h_FBMC;
-        xD_est_OneTapEqualizer_FBMC_Aux_PerfectCSI = real(x_est_OneTapEqualizer_FBMC_Aux_PerfectCSI(AuxilaryPilotMatrix_FBMC(:)==0)./sqrt(AuxiliaryMethod.DataPowerReduction));
-        DetectedBitStream_OneTapEqualizer_FBMC_Aux_PerfectCSI = PAM.Symbol2Bit(xD_est_OneTapEqualizer_FBMC_Aux_PerfectCSI);   
-        BER_FBMC_Aux_OneTapEqualizer_PerfectCSI(i_SNR,i_rep) = mean(BinaryDataStream_FBMC_Aux~=DetectedBitStream_OneTapEqualizer_FBMC_Aux_PerfectCSI);    
+%        x_est_OneTapEqualizer_FBMC_Aux_PerfectCSI = y_FBMC_Aux./h_FBMC;
+%        xD_est_OneTapEqualizer_FBMC_Aux_PerfectCSI = real(x_est_OneTapEqualizer_FBMC_Aux_PerfectCSI(AuxilaryPilotMatrix_FBMC(:)==0)./sqrt(AuxiliaryMethod.DataPowerReduction));
+%        DetectedBitStream_OneTapEqualizer_FBMC_Aux_PerfectCSI = PAM.Symbol2Bit(xD_est_OneTapEqualizer_FBMC_Aux_PerfectCSI);   
+%        BER_FBMC_Aux_OneTapEqualizer_PerfectCSI(i_SNR,i_rep) = mean(BinaryDataStream_FBMC_Aux~=DetectedBitStream_OneTapEqualizer_FBMC_Aux_PerfectCSI);    
       
        
         %% 改进的信道估计和数据检测
         xD_est_FBMC_Aux_Temp = xD_est_OneTapEqualizer_FBMC_Aux; % 单抽头估计值初始化   
-        xD_est_FBMC_Aux_PerfectCSI_Temp = xD_est_OneTapEqualizer_FBMC_Aux_PerfectCSI; % 单抽头估计值初始化     
+    %    xD_est_FBMC_Aux_PerfectCSI_Temp = xD_est_OneTapEqualizer_FBMC_Aux_PerfectCSI; % 单抽头估计值初始化     
         D_FBMC_est_Aux_Temp  = D_FBMC_est_Aux;
         h_est_FBMC_Aux_Temp  = h_est_FBMC_Aux;
          for i_iteration = 1:NrIterations
@@ -276,16 +289,22 @@ for i_rep = 1:NrRepetitions
             xD_est_FBMC_Aux_Temp = real(x_est_FBMC_Aux_Temp(AuxilaryPilotMatrix_FBMC(:)==0)./sqrt(AuxiliaryMethod.DataPowerReduction));
      
             DetectedBitStream_FBMC_Aux_Temp = PAM.Symbol2Bit(xD_est_FBMC_Aux_Temp); 
-      
-            BER_FBMC_Aux_InterferenceCancellation(i_SNR,i_rep,i_iteration) = mean(BinaryDataStream_FBMC_Aux~=DetectedBitStream_FBMC_Aux_Temp);
+            % 信道解码
+             DetectedBitStream_FBMC_Aux_Temp = DetectedBitStream_FBMC_Aux_Temp';
+             x = zeros(1,2*tblen);
+             DetectedBitStream_FBMC_Aux_Temp_AddZeros = [DetectedBitStream_FBMC_Aux_Temp,x];
+             DetectedBitStream_FBMC_Aux_Temp_Vitdec = vitdec(DetectedBitStream_FBMC_Aux_Temp_AddZeros,trel,tblen,'cont','hard');
+             DetectedBitStream_FBMC_Aux_Temp_Decoded = DetectedBitStream_FBMC_Aux_Temp_Vitdec(tblen+1:end);
+             DetectedBitStream_FBMC_Aux_Temp_Decoded = DetectedBitStream_FBMC_Aux_Temp_Decoded';
+             BER_FBMC_Aux_InterferenceCancellation(i_SNR,i_rep,i_iteration) = mean(BinaryDataStream_FBMC_Aux~=DetectedBitStream_FBMC_Aux_Temp_Decoded);
           
             % 完美信道信息
-            y_FBMC_Aux_InterferenceCancellation_PerfectCSI = (y_FBMC_Aux(:) - (D_FBMC-diag(h_FBMC))*AuxiliaryMethod.PrecodingMatrix*[xP_FBMC;PAM.SymbolQuantization(xD_est_FBMC_Aux_PerfectCSI_Temp)]);                
+   %         y_FBMC_Aux_InterferenceCancellation_PerfectCSI = (y_FBMC_Aux(:) - (D_FBMC-diag(h_FBMC))*AuxiliaryMethod.PrecodingMatrix*[xP_FBMC;PAM.SymbolQuantization(xD_est_FBMC_Aux_PerfectCSI_Temp)]);                
   
-            x_est_FBMC_Aux_PerfectCSI_Temp = y_FBMC_Aux_InterferenceCancellation_PerfectCSI./h_FBMC;
-            xD_est_FBMC_Aux_PerfectCSI_Temp = real(x_est_FBMC_Aux_PerfectCSI_Temp(AuxilaryPilotMatrix_FBMC(:)==0)./sqrt(AuxiliaryMethod.DataPowerReduction));
-            DetectedBitStream_FBMC_Aux_PerfectCSI_Temp = PAM.Symbol2Bit(xD_est_FBMC_Aux_PerfectCSI_Temp);   
-            BER_FBMC_Aux_PerfectCSI_InterferenceCancellation(i_SNR,i_rep,i_iteration) = mean(BinaryDataStream_FBMC_Aux~=DetectedBitStream_FBMC_Aux_PerfectCSI_Temp);    
+   %         x_est_FBMC_Aux_PerfectCSI_Temp = y_FBMC_Aux_InterferenceCancellation_PerfectCSI./h_FBMC;
+   %         xD_est_FBMC_Aux_PerfectCSI_Temp = real(x_est_FBMC_Aux_PerfectCSI_Temp(AuxilaryPilotMatrix_FBMC(:)==0)./sqrt(AuxiliaryMethod.DataPowerReduction));
+   %         DetectedBitStream_FBMC_Aux_PerfectCSI_Temp = PAM.Symbol2Bit(xD_est_FBMC_Aux_PerfectCSI_Temp);   
+   %         BER_FBMC_Aux_PerfectCSI_InterferenceCancellation(i_SNR,i_rep,i_iteration) = mean(BinaryDataStream_FBMC_Aux~=DetectedBitStream_FBMC_Aux_PerfectCSI_Temp);    
          
         end    
 
