@@ -13,11 +13,11 @@ L                         = 12*2;                   % 子载波数，一个资�
 F                         = 15e3;                   % 子载波间隔（Hz�?
 SamplingRate              = F*12*2;                 % 采样率（采样�?/秒）
 NrSubframes               = 1;                      % 子帧的数目�?�F=15kHz时，�?个子帧需�?1ms�?                             
-QAM_ModulationOrder       = 4;                      % QAM信号星座顺序�?4�?16�?64�?256�?1024，�?��?��??
+QAM_ModulationOrder       = 16;                      % QAM信号星座顺序�?4�?16�?64�?256�?1024，�?��?��??
 
 % 信道估计参数
 PilotToDataPowerOffsetAux = 4.685;                  % FBMC的导频到数据功率偏移，辅助方法�??
-NrIterations              = 4;                      % 干扰消除方案的迭代次数�??
+NrIterations              = 1;                      % 干扰消除方案的迭代次数�??
 % 信道编码参数
  codeRate = [11/21]; %1/3 1/2 2/3 3/4 5/6 8/9
  BG = 1;
